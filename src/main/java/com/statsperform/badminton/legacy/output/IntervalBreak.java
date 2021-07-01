@@ -1,4 +1,4 @@
-package com.statsperform.badminton.legacy;
+package com.statsperform.badminton.legacy.output;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -10,12 +10,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class IncidentPacket
+public class IntervalBreak
 {
 	private int seqNum;
 	private String timestamp;
 	private String eventElementType;
-	private String delayStatus;
-	private Incident incident;
-	private GameScores scores;
 }

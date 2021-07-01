@@ -1,4 +1,4 @@
-package com.statsperform.badminton.legacy;
+package com.statsperform.badminton.legacy.output;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 

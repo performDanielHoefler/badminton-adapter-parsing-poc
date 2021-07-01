@@ -6,40 +6,21 @@
 	<artifactId>badminton-adapter-parsing-poc</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>xmlbeans-maven-plugin</artifactId>
-				<version>2.3.3</version>
-				<executions>
-					<execution>
-						<phase>generate-sources</phase>
-						<goals>
-							<goal>xmlbeans</goal>
-						</goals>
-					</execution>
-				</executions>
-				<inherited>true</inherited>
-				<configuration>
-					<schemaDirectory>src/main/xsd</schemaDirectory>
-				</configuration>
-			</plugin>
-		</plugins>
-	</build>
-	
 	<dependencies>
-		<!-- just for a quick start, in the actual project a different lib should be used -->
 		<dependency>
-			<groupId>org.apache.xmlbeans</groupId>
-			<artifactId>xmlbeans</artifactId>
-			<version>2.4.0</version>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<version>1.18.20</version>
 		</dependency>
-		
 		<dependency>
-			<groupId>com.statsperform</groupId>
-			<artifactId>crionet-common</artifactId>
-			<version>1.0.7</version>
+			<groupId>com.fasterxml.jackson.dataformat</groupId>
+			<artifactId>jackson-dataformat-xml</artifactId>
+			<version>2.12.3</version>
+		</dependency>
+		<dependency>
+			<groupId>commons-io</groupId>
+			<artifactId>commons-io</artifactId>
+			<version>2.10.0</version>
 		</dependency>
 	</dependencies>
 </project>

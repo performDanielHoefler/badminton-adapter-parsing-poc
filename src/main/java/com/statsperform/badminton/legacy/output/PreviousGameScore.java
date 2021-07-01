@@ -1,4 +1,4 @@
-package com.statsperform.badminton.legacy;
+package com.statsperform.badminton.legacy.output;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -10,8 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class Incident
+public class PreviousGameScore extends CurrentGameScore
 {
-	private String type;
-	private String player;
+	private String winner;
 }

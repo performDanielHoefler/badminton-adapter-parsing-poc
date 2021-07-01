@@ -1,4 +1,4 @@
-package com.statsperform.badminton.legacy;
+package com.statsperform.badminton.legacy.output;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -10,9 +10,13 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ConnectionRestored
+public class MatchFinished
 {
-	private long seqNum;
+	private int duration;
+	private String winner;
 	private String timestamp;
+	private String reason;
 	private String eventElementType;
+	private int seqNum;
+	private String delayStatus;
 }

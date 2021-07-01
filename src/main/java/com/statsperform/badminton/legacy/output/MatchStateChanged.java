@@ -1,6 +1,4 @@
-package com.statsperform.badminton.legacy;
-
-import java.util.List;
+package com.statsperform.badminton.legacy.output;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -12,8 +10,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class GameScores
+public class MatchStateChanged
 {
-	private CurrentGameScore currentGameScore;
-	private List<PreviousGameScore> previousGameScores;
+	private int seqNum;
+	private String timestamp;
+	private String delayStatus;
+	private String matchState;
+	private String eventElementType;
 }

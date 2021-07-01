@@ -1,5 +1,4 @@
-package com.statsperform.badminton.legacy;
-
+package com.statsperform.badminton.legacy.output;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import lombok.AllArgsConstructor;
@@ -10,10 +9,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class Alarm
+public class Official
 {
-	private int seqNum;
-	private String timestamp;
-	private String eventElementType;
-	private String lastReceivedTimestamp;
+	private String name;
+	private String firstName;
+	private String country;
 }

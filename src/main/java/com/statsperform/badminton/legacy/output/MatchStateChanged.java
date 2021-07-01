@@ -16,5 +16,5 @@ public class MatchStateChanged
 	private String timestamp;
 	private String delayStatus;
 	private String matchState;
-	private String eventElementType;
+	private final String eventElementType = "MatchStateChanged";
 }

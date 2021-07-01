@@ -14,7 +14,7 @@ public class IncidentPacket
 {
 	private int seqNum;
 	private String timestamp;
-	private String eventElementType;
+	private final String eventElementType = "IncidentEvent";
 	private String delayStatus;
 	private Incident incident;
 	private GameScores scores;

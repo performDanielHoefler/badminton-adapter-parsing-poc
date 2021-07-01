@@ -23,7 +23,7 @@ public class Pregame
 	private Team teamA;
 	private String receiver;
 	private String matchState;
-	private String eventElementType;
+	private final String eventElementType = "BadmintonPregame";
 	private int seqNum;
 	private String round;
 	private Team teamB;

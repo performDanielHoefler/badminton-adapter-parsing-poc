@@ -14,5 +14,5 @@ public class IntervalBreak
 {
 	private int seqNum;
 	private String timestamp;
-	private String eventElementType;
+	private final String eventElementType = "IntervalBreak";
 }

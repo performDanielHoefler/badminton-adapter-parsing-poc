@@ -14,6 +14,6 @@ public class Alarm
 {
 	private int seqNum;
 	private String timestamp;
-	private String eventElementType;
+	private final String eventElementType = "Alarm";
 	private String lastReceivedTimestamp;
 }

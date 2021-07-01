@@ -14,5 +14,5 @@ public class ConnectionRestored
 {
 	private long seqNum;
 	private String timestamp;
-	private String eventElementType;
+	private final String eventElementType = "ConnectionRestored";
 }

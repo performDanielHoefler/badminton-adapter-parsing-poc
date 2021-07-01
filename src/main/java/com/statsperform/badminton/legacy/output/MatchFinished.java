@@ -16,7 +16,7 @@ public class MatchFinished
 	private String winner;
 	private String timestamp;
 	private String reason;
-	private String eventElementType;
+	private final String eventElementType = "MatchFinished";
 	private int seqNum;
 	private String delayStatus;
 }

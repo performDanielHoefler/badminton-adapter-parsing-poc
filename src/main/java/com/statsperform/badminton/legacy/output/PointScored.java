@@ -18,7 +18,7 @@ public class PointScored
 	private String scoringTeam;
 	private String receiver;
 	private GameScores gameScores;
-	private String eventElementType;
+	private final String eventElementType = "PointScored";
 	private String delayStatus;
 	private int seqNum;
 }

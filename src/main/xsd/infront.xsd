@@ -1,0 +1,169 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="court">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element type="xs:string" name="matchstate"/>
+        <xs:element type="xs:string" name="tournament"/>
+        <xs:element type="xs:string" name="tournamentcode"/>
+        <xs:element name="team1">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="player1">
+                <xs:complexType>
+                  <xs:simpleContent>
+                    <xs:extension base="xs:string">
+                      <xs:attribute type="xs:string" name="name"/>
+                      <xs:attribute type="xs:string" name="country"/>
+                      <xs:attribute type="xs:int" name="memberid"/>
+                    </xs:extension>
+                  </xs:simpleContent>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="player2">
+                <xs:complexType>
+                  <xs:simpleContent>
+                    <xs:extension base="xs:string">
+                      <xs:attribute type="xs:string" name="name"/>
+                      <xs:attribute type="xs:string" name="country"/>
+                      <xs:attribute type="xs:int" name="memberid"/>
+                    </xs:extension>
+                  </xs:simpleContent>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute type="xs:string" name="country"/>
+            <xs:attribute type="xs:string" name="name"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="team2">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="player1">
+                <xs:complexType>
+                  <xs:simpleContent>
+                    <xs:extension base="xs:string">
+                      <xs:attribute type="xs:string" name="name"/>
+                      <xs:attribute type="xs:string" name="country"/>
+                      <xs:attribute type="xs:int" name="memberid"/>
+                    </xs:extension>
+                  </xs:simpleContent>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="player2">
+                <xs:complexType>
+                  <xs:simpleContent>
+                    <xs:extension base="xs:string">
+                      <xs:attribute type="xs:string" name="name"/>
+                      <xs:attribute type="xs:string" name="country"/>
+                      <xs:attribute type="xs:int" name="memberid"/>
+                    </xs:extension>
+                  </xs:simpleContent>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute type="xs:string" name="country"/>
+            <xs:attribute type="xs:string" name="name"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="official1">
+          <xs:complexType>
+            <xs:simpleContent>
+              <xs:extension base="xs:string">
+                <xs:attribute type="xs:string" name="name"/>
+                <xs:attribute type="xs:string" name="firstname"/>
+                <xs:attribute type="xs:string" name="country"/>
+              </xs:extension>
+            </xs:simpleContent>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="official2">
+          <xs:complexType>
+            <xs:simpleContent>
+              <xs:extension base="xs:string">
+                <xs:attribute type="xs:string" name="name"/>
+                <xs:attribute type="xs:string" name="firstname"/>
+                <xs:attribute type="xs:string" name="country"/>
+              </xs:extension>
+            </xs:simpleContent>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="sets">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="set">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="scores">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="score">
+                            <xs:complexType>
+                              <xs:simpleContent>
+                                <xs:extension base="xs:string">
+                                  <xs:attribute type="xs:byte" name="t1"/>
+                                  <xs:attribute type="xs:byte" name="t2"/>
+                                </xs:extension>
+                              </xs:simpleContent>
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="stats">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="stat" maxOccurs="unbounded" minOccurs="0">
+                            <xs:complexType>
+                              <xs:simpleContent>
+                                <xs:extension base="xs:string">
+                                  <xs:attribute type="xs:short" name="id" use="optional"/>
+                                  <xs:attribute type="xs:byte" name="value" use="optional"/>
+                                </xs:extension>
+                              </xs:simpleContent>
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute type="xs:byte" name="w"/>
+                  <xs:attribute type="xs:byte" name="t1"/>
+                  <xs:attribute type="xs:byte" name="t2"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="stats">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="stat" maxOccurs="unbounded" minOccurs="0">
+                <xs:complexType>
+                  <xs:simpleContent>
+                    <xs:extension base="xs:string">
+                      <xs:attribute type="xs:short" name="id" use="optional"/>
+                      <xs:attribute type="xs:byte" name="value" use="optional"/>
+                    </xs:extension>
+                  </xs:simpleContent>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute type="xs:byte" name="id"/>
+      <xs:attribute type="xs:byte" name="name"/>
+      <xs:attribute type="xs:byte" name="matchid"/>
+      <xs:attribute type="xs:byte" name="packetid"/>
+      <xs:attribute type="xs:byte" name="winner"/>
+      <xs:attribute type="xs:byte" name="winnerscorestatus"/>
+      <xs:attribute type="xs:string" name="event"/>
+      <xs:attribute type="xs:string" name="round"/>
+      <xs:attribute type="xs:byte" name="duration"/>
+      <xs:attribute type="xs:byte" name="service"/>
+      <xs:attribute type="xs:byte" name="receiver"/>
+      <xs:attribute type="xs:byte" name="team1challengesremaining"/>
+      <xs:attribute type="xs:byte" name="team2challengesremaining"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

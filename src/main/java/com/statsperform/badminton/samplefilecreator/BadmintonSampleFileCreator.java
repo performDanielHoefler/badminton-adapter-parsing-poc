@@ -23,13 +23,13 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.statsperform.badminton.infronet.input.Court;
 import com.statsperform.badminton.infronet.input.MatchState;
 import com.statsperform.badminton.infronet.input.Ping;
+import com.statsperform.badminton.legacy.output.MatchFinished;
 import com.statsperform.badminton.legacy.output.MatchStateChanged;
 
 public class BadmintonSampleFileCreator
 {
-	private String inputFileLocation = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\BWF\\Denmarkopen\\fullmatchfile\\fullmatchfile.txt";
+	private String inputFileLocation = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\BWF\\Denmarkopen\\fullmatchfile_per_game\\fullmatch ID 127.txt";
 	private String outputFileRootPathString = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\IMG\\fullmatchfile";
-	private String outputFileName = "fullmatchsample.txt";
 	
 	private XmlMapper xmlMapper;
 	private ObjectMapper jsonObjMapper = new ObjectMapper();
@@ -37,6 +37,8 @@ public class BadmintonSampleFileCreator
 	private final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 	
 	private final Map<String, String> infronetToIMGMatchStateMapping = new HashMap<>();
+	
+	private final String FINISHED_STATUS = "F";
 	
 	public BadmintonSampleFileCreator ()
 	{
@@ -51,7 +53,7 @@ public class BadmintonSampleFileCreator
 		infronetToIMGMatchStateMapping.put("N", "None");
 		infronetToIMGMatchStateMapping.put("C", "OnCourt");
 		infronetToIMGMatchStateMapping.put("P", "InProgress");
-		infronetToIMGMatchStateMapping.put("F", "Finished");
+		infronetToIMGMatchStateMapping.put(FINISHED_STATUS, "Finished");
 		infronetToIMGMatchStateMapping.put("W", "WarmUp");
 		infronetToIMGMatchStateMapping.put("S", "WaitingToStart");
 		infronetToIMGMatchStateMapping.put("H", "Challenge");
@@ -66,7 +68,7 @@ public class BadmintonSampleFileCreator
 
 	public void createSampleFile () throws IOException
 	{
-		Collection<String> outputContent = new ArrayList<>();
+		Map<Integer, List<String>> outputContentByGameId = new HashMap<>();
 		
 		File inputFile = new File (inputFileLocation);
 		
@@ -117,16 +119,28 @@ public class BadmintonSampleFileCreator
 		{
 			messagesForGame = entry.getValue();
 			Court previousMessage = null;
+			//for now we'll just focus on court messages, ping (basically the heartbeats) are irrelevant at this stage)
 			for (Court msg : messagesForGame)
 			{
 				//first message of the game -> MatchStateChange
 				if (previousMessage == null)
 				{
-					MatchStateChanged matchStateChangedMsg = createMatchStateChangedMsg (msg);
-					String jsonOutput = convertToJsonString (matchStateChangedMsg);
-					outputContent.add(jsonOutput);
+					createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
 				}
 				
+				else
+				{
+					//if state has changed, we create another matchStateChanged message
+					if (hasMatchStateChanged(msg, previousMessage))
+					{
+						createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
+						//TODO when game finishes, do we want to have MatchStateChanged and MatchFinished, or only MatchFinished? For now generate both
+						if (hasMatchStateChangedToFinish(msg, previousMessage))
+						{
+							createAndHandleMatchFinishedMsg (msg, outputContentByGameId);
+						}
+					}
+				}
 				previousMessage = msg;
 			}
 		}
@@ -136,16 +150,94 @@ public class BadmintonSampleFileCreator
 		{
 			rootPathOutputFile.mkdirs();
 		}
-		File outputFile = new File (rootPathOutputFile, outputFileName);
-		outputFile.createNewFile();
-		
-		//TODO write one file per game
-		try (FileOutputStream fos = new FileOutputStream(outputFile))
+		for (Entry<Integer, List<String>> entry : outputContentByGameId.entrySet())
 		{
-			IOUtils.writeLines(outputContent, null, fos, "UTF-8");
+			Integer gameId = entry.getKey();
+			List<String> outputForGame = entry.getValue();
+			String outputFileName = "fullmatchsample ID " + gameId + ".txt";
+			File outputFile = new File (rootPathOutputFile, outputFileName);
+			outputFile.createNewFile();
+			
+			try (FileOutputStream fos = new FileOutputStream(outputFile))
+			{
+				IOUtils.writeLines(outputForGame, null, fos, "UTF-8");
+			}
 		}
 	}
 	
+	private void createAndHandleMatchFinishedMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
+	{
+		MatchFinished matchFinishedMsg = createMatchFinishedMsg (msg);
+		String jsonOutput = convertToJsonString (matchFinishedMsg);
+		addToOutputContentMap (jsonOutput, msg.getMatchId(), outputContentByGameId);
+	}
+
+	private MatchFinished createMatchFinishedMsg(Court msg)
+	{
+		MatchFinished matchFinished = new MatchFinished();
+		matchFinished.setDurationInMinutes(msg.getDurationInMinutes());
+		matchFinished.setReason(reason);
+		matchFinished.setSeqNum(seqNum);
+		matchFinished.setTimestamp(timestamp);
+		matchFinished.setWinner(winner);
+		
+		//TODO ignore delayStatus for now
+		return null;
+	}
+
+	private boolean hasMatchStateChangedToFinish(Court curMsg, Court previousMessage)
+	{
+		boolean isFinished = false;
+		if (hasMatchStateChanged(curMsg, previousMessage) && isFinishedMatchState (curMsg))
+		{
+			isFinished = true;
+		}
+		return isFinished;
+	}
+
+	private boolean isFinishedMatchState(Court msg)
+	{
+		boolean isFinishedState = false;
+		if (msg.getMatchState()!=null && FINISHED_STATUS.equals(msg.getMatchState().getMatchState()))
+		{
+			isFinishedState = true;
+		}
+		return isFinishedState;
+	}
+
+	private void createAndHandleMatchStateChangedMsg(Court msg,
+			Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
+	{
+		MatchStateChanged matchStateChangedMsg = createMatchStateChangedMsg (msg);
+		String jsonOutput = convertToJsonString (matchStateChangedMsg);
+		addToOutputContentMap (jsonOutput, msg.getMatchId(), outputContentByGameId);
+	}
+
+	private boolean hasMatchStateChanged(Court currentMessage, Court previousMessage)
+	{
+		boolean changed = false;
+		
+		MatchState curMatchState = currentMessage.getMatchState();
+		MatchState prevMatchState = previousMessage.getMatchState();
+
+		if (curMatchState!=null && prevMatchState!=null && !curMatchState.getMatchState().equals(prevMatchState.getMatchState()))
+		{
+			changed = true;
+		}
+		return changed;
+	}
+
+	private void addToOutputContentMap(String jsonOutput, int matchId, Map<Integer, List<String>> outputContentByGameId)
+	{
+		List<String> contentForGameId = outputContentByGameId.get(matchId);
+		if (contentForGameId == null)
+		{
+			contentForGameId = new ArrayList<>();
+			outputContentByGameId.put(matchId, contentForGameId);
+		}
+		contentForGameId.add(jsonOutput);
+	}
+
 	private String convertToJsonString(Object obj) throws JsonProcessingException
 	{
 		return jsonObjMapper.writeValueAsString(obj);
@@ -162,8 +254,9 @@ public class BadmintonSampleFileCreator
 			matchStateString = ms.getMatchState();
 		}
 		matchStateChangedMsg.setMatchState(infronetToIMGMatchStateMapping.getOrDefault(matchStateString, matchStateString));
-		matchStateChangedMsg.setSeqNum(msg.getPacketId()); //TODO maybe customer sequencing will have to be introduced here?
+		matchStateChangedMsg.setSeqNum(msg.getPacketId()); //TODO maybe custom sequencing will have to be introduced here?
 		matchStateChangedMsg.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis())); //TODO infronet doesn't provide a timestamp, so we will always have to use current timestamp?
+		//TODO ignore delayStatus for now
 		
 		return matchStateChangedMsg;
 	}

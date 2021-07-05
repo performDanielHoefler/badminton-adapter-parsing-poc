@@ -199,6 +199,7 @@ public class BadmintonSampleFileCreator
 			for (Court msg : messagesForGame)
 			{
 				//first message of the game -> MatchStateChange
+				//TODO or should this rather be a pregame message?
 				if (previousMessage == null)
 				{
 					createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
@@ -233,6 +234,7 @@ public class BadmintonSampleFileCreator
 								+ "], match id [" + msg.getMatchId()
 								+ "]");
 					}
+					//TODO what is IntervalBreak?
 				}
 				previousMessage = msg;
 			}

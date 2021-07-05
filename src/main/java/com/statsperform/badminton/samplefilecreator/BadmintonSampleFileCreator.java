@@ -23,8 +23,16 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.statsperform.badminton.infronet.input.Court;
 import com.statsperform.badminton.infronet.input.MatchState;
 import com.statsperform.badminton.infronet.input.Ping;
+import com.statsperform.badminton.infronet.input.Score;
+import com.statsperform.badminton.infronet.input.Scores;
+import com.statsperform.badminton.infronet.input.Set;
+import com.statsperform.badminton.infronet.input.Sets;
+import com.statsperform.badminton.legacy.output.CurrentGameScore;
+import com.statsperform.badminton.legacy.output.GameScores;
 import com.statsperform.badminton.legacy.output.MatchFinished;
 import com.statsperform.badminton.legacy.output.MatchStateChanged;
+import com.statsperform.badminton.legacy.output.PointScored;
+import com.statsperform.badminton.legacy.output.PreviousGameScore;
 
 public class BadmintonSampleFileCreator
 {
@@ -39,9 +47,13 @@ public class BadmintonSampleFileCreator
 	private final Map<String, String> infronetToIMGMatchStateMapping = new HashMap<>();
 	private final Map<Integer, String> infronetToIMGWinnerStatusMapping = new HashMap<>();
 	private final Map<Integer, String> infronetToIMGWinnerMapping = new HashMap<>();
+	private final Map<Integer, String> teamPlayerMapping = new HashMap<>();
+	private final Map<Integer, String> setWinnerMapping = new HashMap<>();
 	
 	private final String FINISHED_STATUS = "F";
 	private final String UNKNOWN = "Unknown";
+	private final String TEAM_A = "TeamA";
+	private final String TEAM_B = "TeamB";
 	
 	public BadmintonSampleFileCreator ()
 	{
@@ -49,15 +61,32 @@ public class BadmintonSampleFileCreator
 		initMatchStateMappingMap ();
 		initWinnerStatusMapping ();
 		initWinnerMapping ();
+		initTeamPlayerMapping ();
+		initSetWinnerMapping ();
 		
 		sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 	}
 	
+	private void initSetWinnerMapping()
+	{
+		setWinnerMapping.put(1, TEAM_A);
+		setWinnerMapping.put(2, TEAM_B);
+	}
+
+	private void initTeamPlayerMapping()
+	{
+		teamPlayerMapping.put(0, "None"); //TODO there is no None on IMG
+		teamPlayerMapping.put(1, "TeamAPlayer1");
+		teamPlayerMapping.put(2, "TeamAPlayer2");
+		teamPlayerMapping.put(3, "TeamBPlayer1");
+		teamPlayerMapping.put(4, "TeamBPlayer1");
+	}
+
 	private void initWinnerMapping()
 	{
 		infronetToIMGWinnerMapping.put(0, "NoWinner");
-		infronetToIMGWinnerMapping.put(1, "TeamA");
-		infronetToIMGWinnerMapping.put(2, "TeamB");
+		infronetToIMGWinnerMapping.put(1, TEAM_A);
+		infronetToIMGWinnerMapping.put(2, TEAM_B);
 		infronetToIMGWinnerMapping.put(3, "Tie"); //TODO there is no Tie on IMG, just add this value maybe?
 	}
 
@@ -164,6 +193,10 @@ public class BadmintonSampleFileCreator
 							createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
 						}
 					}
+					else if (hasScoreChanged (msg, previousMessage))
+					{
+						createAndHandlePointScoredMsg (msg, outputContentByGameId);
+					}
 				}
 				previousMessage = msg;
 			}
@@ -189,6 +222,199 @@ public class BadmintonSampleFileCreator
 		}
 	}
 	
+	private void createAndHandlePointScoredMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
+	{
+		PointScored pointScoredMsg = createPointScoredMsg (msg);
+		String jsonOutput = convertToJsonString (pointScoredMsg);
+		addToOutputContentMap (jsonOutput, msg.getMatchId(), outputContentByGameId);
+	}
+
+	private PointScored createPointScoredMsg(Court msg)
+	{
+		PointScored psMsg = new PointScored();
+		psMsg.setGameScores(getGameScores (msg));
+		psMsg.setReceiver(getReceiver (msg));
+		psMsg.setScoringTeam(getScoringTeam (msg));
+		psMsg.setSeqNum(msg.getPacketId());
+		psMsg.setServer(getServer (msg));
+		psMsg.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis()));
+		psMsg.setUndo(false); //TODO for now always assume it's not a score correction
+		
+		//TODO omit delayStatus for now
+		return psMsg;
+	}
+
+	private GameScores getGameScores(Court msg)
+	{
+		GameScores gameScores = new GameScores();
+		gameScores.setCurrentGameScore(getCurrentGameScore (msg));
+		gameScores.setPreviousGameScores(getPreviousGameScores(msg));
+		return gameScores;
+	}
+
+	private List<PreviousGameScore> getPreviousGameScores(Court msg)
+	{
+		List<PreviousGameScore> prevGameScoreList = new ArrayList<>();
+		List<Set> setList = getSetList (msg.getSets());
+		//exclude last set, this is shown in currentGameScore
+		PreviousGameScore prevGameScore = null;
+		for (int i=0;i<setList.size()-1;i++)
+		{
+			prevGameScore = new PreviousGameScore();
+			Set set = setList.get(i);
+			setScoreInfo(prevGameScore, getLastScore(set));
+			
+			prevGameScore.setWinner(setWinnerMapping.get(set.getWinner()));
+			prevGameScoreList.add(prevGameScore);
+		}
+		return prevGameScoreList;
+	}
+
+	private CurrentGameScore getCurrentGameScore(Court msg)
+	{
+		CurrentGameScore curGameScore = new CurrentGameScore();
+		Score lastScore = getLastScore(getLastSet(getSetList(msg.getSets())));
+		setScoreInfo (curGameScore, lastScore);
+		
+		return curGameScore;
+	}
+
+	private void setScoreInfo(CurrentGameScore gameScore, Score score)
+	{
+		gameScore.setTeamA(score.getPoints1());
+		gameScore.setTeamB(score.getPoints2());
+	}
+
+	private String getScoringTeam(Court msg)
+	{
+		String scoringTeam = UNKNOWN; //TODO there is no Unknown on IMG, but use it as fallback?
+		
+		List<Set> setList = getSetList(msg.getSets());
+		if (collectionNotNullAndNotEmpty(setList))
+		{
+			Set lastSet = getLastSet(setList);
+			if (lastSet!=null)
+			{
+				Score lastScore = getLastScore (lastSet);
+				Score secondLastScore = getSecondLastScore (lastSet);
+				
+				if (lastScore.getPoints1()>secondLastScore.getPoints1())
+				{
+					scoringTeam = TEAM_A;
+				}
+				else if (lastScore.getPoints2()>secondLastScore.getPoints2())
+				{
+					scoringTeam = TEAM_B;
+				}
+			}
+		}
+		
+		return scoringTeam;
+	}
+
+	private Score getSecondLastScore(Set set)
+	{
+		Score result = null;
+		List<Score> scoreList = getScoreList (set);
+		if (scoreList!=null)
+		{
+			result = scoreList.get(scoreList.size()-2);
+		}
+		return result;
+	}
+
+	private Score getLastScore(Set set)
+	{
+		Score lastScore = null;
+		List<Score> scoreList = getScoreList (set);
+		if (scoreList!=null)
+		{
+			lastScore = scoreList.get(scoreList.size()-1);
+		}
+		return lastScore;
+	}
+
+	private List<Score> getScoreList(Set set)
+	{
+		List<Score> scoreList = null;
+		
+		Scores scores = set.getScores();
+		if (scores!=null)
+		{
+			scoreList = scores.getScoreList();
+		}
+		
+		return scoreList;
+	}
+
+	private String getReceiver(Court msg)
+	{
+		return teamPlayerMapping.getOrDefault(msg.getReceiver(), UNKNOWN); //TODO there is no Unknown on IMG
+	}
+
+	private String getServer(Court msg)
+	{
+		return teamPlayerMapping.getOrDefault(msg.getService(), UNKNOWN); //TODO there is no Unknown on IMG
+	}
+
+	private boolean hasScoreChanged(Court curMsg, Court previousMessage)
+	{
+		boolean hasChanged = false;
+		
+		List<Set> curMsgSetList = getSetList (curMsg.getSets());
+		List<Set> prevMsgSetList = getSetList (previousMessage.getSets());
+		if (collectionNotNullAndNotEmpty (curMsgSetList) && collectionNotNullAndNotEmpty(prevMsgSetList))
+		{
+			if (curMsgSetList.size()!=prevMsgSetList.size())
+			{
+				hasChanged = true;
+			}
+			else
+			{
+				//get the last set and check if there are differences in sizes. If yes, score has changed
+				Set curMsgLastSet = getLastSet (curMsgSetList);
+				Set prevMsgLastSet = getLastSet (prevMsgSetList);
+				
+				List<Score> curMsgScoreList = getScoreList(curMsgLastSet);
+				List<Score> prevMsgScoreList = getScoreList(prevMsgLastSet);
+				if (collectionNotNullAndNotEmpty(curMsgScoreList)
+						&& collectionNotNullAndNotEmpty(prevMsgScoreList))
+				{
+					if (curMsgScoreList.size()!=prevMsgScoreList.size())
+					{
+						hasChanged = true;
+					}
+				}
+			}
+		}
+		return hasChanged;
+	}
+
+	private List<Set> getSetList(Sets sets)
+	{
+		List<Set> setList = null;
+		if (sets!=null)
+		{
+			setList = sets.getSet();
+		}
+		return setList;
+	}
+
+	private Set getLastSet(List<Set> setList)
+	{
+		Set lastSet = null;
+		if (collectionNotNullAndNotEmpty(setList))
+		{
+			lastSet = setList.get(setList.size()-1);
+		}
+		return lastSet;
+	}
+
+	private boolean collectionNotNullAndNotEmpty(List<?> list)
+	{
+		return list!=null && !list.isEmpty();
+	}
+
 	private void createAndHandleMatchFinishedMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
 	{
 		MatchFinished matchFinishedMsg = createMatchFinishedMsg (msg);

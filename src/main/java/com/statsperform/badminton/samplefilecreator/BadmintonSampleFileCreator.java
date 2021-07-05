@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.Map.Entry;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -202,7 +203,6 @@ public class BadmintonSampleFileCreator
 				{
 					createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
 				}
-				
 				else
 				{
 					//if state has changed, we create another matchStateChanged message
@@ -320,7 +320,7 @@ public class BadmintonSampleFileCreator
 		boolean isIncident = false;
 		
 		List<Set> setList = getSetList(msg.getSets());
-		if (collectionNotNullAndNotEmpty(setList))
+		if (CollectionUtils.isNotEmpty(setList))
 		{
 			Set lastSet = getLastSet(setList);
 			if (lastSet!=null)
@@ -407,7 +407,7 @@ public class BadmintonSampleFileCreator
 		String scoringTeam = UNKNOWN; //TODO there is no Unknown on IMG, but use it as fallback?
 		
 		List<Set> setList = getSetList(msg.getSets());
-		if (collectionNotNullAndNotEmpty(setList))
+		if (CollectionUtils.isNotEmpty(setList))
 		{
 			Set lastSet = getLastSet(setList);
 			if (lastSet!=null)
@@ -480,7 +480,7 @@ public class BadmintonSampleFileCreator
 		
 		List<Set> curMsgSetList = getSetList (curMsg.getSets());
 		List<Set> prevMsgSetList = getSetList (previousMessage.getSets());
-		if (collectionNotNullAndNotEmpty (curMsgSetList) && collectionNotNullAndNotEmpty(prevMsgSetList))
+		if (CollectionUtils.isNotEmpty (curMsgSetList) && CollectionUtils.isNotEmpty(prevMsgSetList))
 		{
 			if (curMsgSetList.size()!=prevMsgSetList.size())
 			{
@@ -488,13 +488,15 @@ public class BadmintonSampleFileCreator
 			}
 			else
 			{
-				//get the last set and compare last and second last score. If they differ, we have a score change
+				//Score has changed if score sizes differ and last and second last point score differ
+				//TODO clarify how to interpret when there's no change in scores compared to previous one (size and content equal)
 				Set curMsgLastSet = getLastSet (curMsgSetList);
+				Set prevMsgLastSet = getLastSet (prevMsgSetList);
 				
 				Score lastScore = getLastScore(curMsgLastSet);
 				Score secondLastScore = getSecondLastScore(curMsgLastSet);
-				if (lastScore.getPoints1()!=secondLastScore.getPoints1()
-						|| lastScore.getPoints2()!=secondLastScore.getPoints2())
+				if (getScoreList(curMsgLastSet).size()!=getScoreList(prevMsgLastSet).size()
+						&& (lastScore.getPoints1()!=secondLastScore.getPoints1() || lastScore.getPoints2()!=secondLastScore.getPoints2()))
 				{
 					hasChanged = true;
 				}
@@ -516,16 +518,11 @@ public class BadmintonSampleFileCreator
 	private Set getLastSet(List<Set> setList)
 	{
 		Set lastSet = null;
-		if (collectionNotNullAndNotEmpty(setList))
+		if (CollectionUtils.isNotEmpty(setList))
 		{
 			lastSet = setList.get(setList.size()-1);
 		}
 		return lastSet;
-	}
-
-	private boolean collectionNotNullAndNotEmpty(List<?> list)
-	{
-		return list!=null && !list.isEmpty();
 	}
 
 	private void createAndHandleMatchFinishedMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException

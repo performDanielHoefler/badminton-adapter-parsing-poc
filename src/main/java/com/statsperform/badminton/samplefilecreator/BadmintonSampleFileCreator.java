@@ -15,6 +15,7 @@ import java.util.TimeZone;
 import java.util.Map.Entry;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -29,6 +30,8 @@ import com.statsperform.badminton.infronet.input.Set;
 import com.statsperform.badminton.infronet.input.Sets;
 import com.statsperform.badminton.legacy.output.CurrentGameScore;
 import com.statsperform.badminton.legacy.output.GameScores;
+import com.statsperform.badminton.legacy.output.Incident;
+import com.statsperform.badminton.legacy.output.IncidentPacket;
 import com.statsperform.badminton.legacy.output.MatchFinished;
 import com.statsperform.badminton.legacy.output.MatchStateChanged;
 import com.statsperform.badminton.legacy.output.PointScored;
@@ -49,11 +52,16 @@ public class BadmintonSampleFileCreator
 	private final Map<Integer, String> infronetToIMGWinnerMapping = new HashMap<>();
 	private final Map<Integer, String> teamPlayerMapping = new HashMap<>();
 	private final Map<Integer, String> setWinnerMapping = new HashMap<>();
+	private final Map<String, String> infronetIncidentMapping = new HashMap<>();
 	
 	private final String FINISHED_STATUS = "F";
 	private final String UNKNOWN = "Unknown";
 	private final String TEAM_A = "TeamA";
 	private final String TEAM_B = "TeamB";
+	private final String TEAM_A_PLAYER_1 = "TeamAPlayer1";
+	private final String TEAM_A_PLAYER_2 = "TeamAPlayer2";
+	private final String TEAM_B_PLAYER_1 = "TeamBPlayer1";
+	private final String TEAM_B_PLAYER_2 = "TeamBPlayer2";
 	
 	public BadmintonSampleFileCreator ()
 	{
@@ -63,10 +71,27 @@ public class BadmintonSampleFileCreator
 		initWinnerMapping ();
 		initTeamPlayerMapping ();
 		initSetWinnerMapping ();
+		initIncidentMapping ();
 		
 		sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 	}
 	
+	private void initIncidentMapping()
+	{
+		infronetIncidentMapping.put("W", "Warning");
+		infronetIncidentMapping.put("F", "Fault");
+		infronetIncidentMapping.put("R", "RefereeCalled");
+		infronetIncidentMapping.put("S", "Suspension");
+		infronetIncidentMapping.put("O", "Overrule");
+		infronetIncidentMapping.put("I", "Injury");
+		infronetIncidentMapping.put("Dis", "Disqualified");
+		infronetIncidentMapping.put("Ret", "Retired");
+		infronetIncidentMapping.put("C", "ServiceError"); //TODO infronet calls this service Court error, probably they mean the same?
+		infronetIncidentMapping.put("CW", "ChallengeWon");
+		infronetIncidentMapping.put("CL", "ChallengeLost");
+		infronetIncidentMapping.put("CN", "ChallengeNoDecision");
+	}
+
 	private void initSetWinnerMapping()
 	{
 		setWinnerMapping.put(1, TEAM_A);
@@ -76,10 +101,10 @@ public class BadmintonSampleFileCreator
 	private void initTeamPlayerMapping()
 	{
 		teamPlayerMapping.put(0, "None"); //TODO there is no None on IMG
-		teamPlayerMapping.put(1, "TeamAPlayer1");
-		teamPlayerMapping.put(2, "TeamAPlayer2");
-		teamPlayerMapping.put(3, "TeamBPlayer1");
-		teamPlayerMapping.put(4, "TeamBPlayer1");
+		teamPlayerMapping.put(1, TEAM_A_PLAYER_1);
+		teamPlayerMapping.put(2, TEAM_A_PLAYER_2);
+		teamPlayerMapping.put(3, TEAM_B_PLAYER_1);
+		teamPlayerMapping.put(4, TEAM_B_PLAYER_2);
 	}
 
 	private void initWinnerMapping()
@@ -193,9 +218,20 @@ public class BadmintonSampleFileCreator
 							createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
 						}
 					}
+					//TODO is it possible that the score changes in the same message as when an incident occurs? For now let's assume not
 					else if (hasScoreChanged (msg, previousMessage))
 					{
 						createAndHandlePointScoredMsg (msg, outputContentByGameId);
+					}
+					else if (isIncident (msg))
+					{
+						createAndHandleIncientMsg (msg, outputContentByGameId);
+					}
+					else
+					{
+						System.out.println("No message was created for packet with ID [" + msg.getPacketId()
+								+ "], match id [" + msg.getMatchId()
+								+ "]");
 					}
 				}
 				previousMessage = msg;
@@ -222,6 +258,87 @@ public class BadmintonSampleFileCreator
 		}
 	}
 	
+	private void createAndHandleIncientMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
+	{
+		IncidentPacket incidentMsg = createIncidentPacketMsg (msg);
+		String jsonOutput = convertToJsonString (incidentMsg);
+		addToOutputContentMap (jsonOutput, msg.getMatchId(), outputContentByGameId);
+	}
+
+	private IncidentPacket createIncidentPacketMsg(Court msg)
+	{
+		IncidentPacket icp = new IncidentPacket();
+		icp.setIncident(getIncidentData (msg));
+		icp.setScores(getGameScores(msg));
+		icp.setSeqNum(msg.getPacketId());
+		icp.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis()));
+		
+		//TODO for now omit delayStatus attribute
+		return icp;
+	}
+
+	private Incident getIncidentData(Court msg)
+	{
+		Incident incident = new Incident();
+		
+		Score lastScore = getLastScore(getLastSet(getSetList(msg.getSets())));
+		
+		String player = UNKNOWN;
+		String typeInfronet = UNKNOWN;
+		
+		if (StringUtils.isNotEmpty(lastScore.getSt1p1()))
+		{
+			player = TEAM_A_PLAYER_1;
+			typeInfronet = lastScore.getSt1p1();
+		}
+		else if (StringUtils.isNotEmpty(lastScore.getSt1p2()))
+		{
+
+			player = TEAM_A_PLAYER_2;
+			typeInfronet = lastScore.getSt1p2();
+		}
+		else if (StringUtils.isNotEmpty(lastScore.getSt2p1()))
+		{
+
+			player = TEAM_B_PLAYER_1;
+			typeInfronet = lastScore.getSt2p1();
+		}
+		else if (StringUtils.isNotEmpty(lastScore.getSt2p2()))
+		{
+
+			player = TEAM_B_PLAYER_2;
+			typeInfronet = lastScore.getSt2p2();
+		}
+		
+		incident.setPlayer(player);
+		incident.setType(infronetIncidentMapping.getOrDefault(typeInfronet, UNKNOWN));
+		return incident;
+	}
+
+	private boolean isIncident(Court msg)
+	{
+		boolean isIncident = false;
+		
+		List<Set> setList = getSetList(msg.getSets());
+		if (collectionNotNullAndNotEmpty(setList))
+		{
+			Set lastSet = getLastSet(setList);
+			if (lastSet!=null)
+			{
+				Score lastScore = getLastScore(lastSet);
+				if (lastScore!=null)
+				{
+					isIncident = StringUtils.isNotEmpty(lastScore.getSt1p1())
+							|| StringUtils.isNotEmpty(lastScore.getSt1p2())
+							|| StringUtils.isNotEmpty(lastScore.getSt2p1())
+							|| StringUtils.isNotEmpty(lastScore.getSt2p2());
+				}
+			}
+		}
+		
+		return isIncident;
+	}
+
 	private void createAndHandlePointScoredMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
 	{
 		PointScored pointScoredMsg = createPointScoredMsg (msg);
@@ -238,7 +355,7 @@ public class BadmintonSampleFileCreator
 		psMsg.setSeqNum(msg.getPacketId());
 		psMsg.setServer(getServer (msg));
 		psMsg.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis()));
-		psMsg.setUndo(false); //TODO for now always assume it's not a score correction
+		psMsg.setUndo(false); //TODO for now always assume it's not a score correction, not entirely sure on how to detect that
 		
 		//TODO omit delayStatus for now
 		return psMsg;
@@ -371,19 +488,15 @@ public class BadmintonSampleFileCreator
 			}
 			else
 			{
-				//get the last set and check if there are differences in sizes. If yes, score has changed
+				//get the last set and compare last and second last score. If they differ, we have a score change
 				Set curMsgLastSet = getLastSet (curMsgSetList);
-				Set prevMsgLastSet = getLastSet (prevMsgSetList);
 				
-				List<Score> curMsgScoreList = getScoreList(curMsgLastSet);
-				List<Score> prevMsgScoreList = getScoreList(prevMsgLastSet);
-				if (collectionNotNullAndNotEmpty(curMsgScoreList)
-						&& collectionNotNullAndNotEmpty(prevMsgScoreList))
+				Score lastScore = getLastScore(curMsgLastSet);
+				Score secondLastScore = getSecondLastScore(curMsgLastSet);
+				if (lastScore.getPoints1()!=secondLastScore.getPoints1()
+						|| lastScore.getPoints2()!=secondLastScore.getPoints2())
 				{
-					if (curMsgScoreList.size()!=prevMsgScoreList.size())
-					{
-						hasChanged = true;
-					}
+					hasChanged = true;
 				}
 			}
 		}

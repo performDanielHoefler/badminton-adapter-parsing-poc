@@ -18,4 +18,7 @@ public class Score
 	private int points2;
 	
 	private String st1p1;
+	private String st1p2;
+	private String st2p1;
+	private String st2p2;
 }

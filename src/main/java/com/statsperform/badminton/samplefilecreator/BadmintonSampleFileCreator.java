@@ -37,17 +37,38 @@ public class BadmintonSampleFileCreator
 	private final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 	
 	private final Map<String, String> infronetToIMGMatchStateMapping = new HashMap<>();
+	private final Map<Integer, String> infronetToIMGWinnerStatusMapping = new HashMap<>();
+	private final Map<Integer, String> infronetToIMGWinnerMapping = new HashMap<>();
 	
 	private final String FINISHED_STATUS = "F";
+	private final String UNKNOWN = "Unknown";
 	
 	public BadmintonSampleFileCreator ()
 	{
 		initXmlMapper ();
 		initMatchStateMappingMap ();
+		initWinnerStatusMapping ();
+		initWinnerMapping ();
 		
 		sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 	}
 	
+	private void initWinnerMapping()
+	{
+		infronetToIMGWinnerMapping.put(0, "NoWinner");
+		infronetToIMGWinnerMapping.put(1, "TeamA");
+		infronetToIMGWinnerMapping.put(2, "TeamB");
+		infronetToIMGWinnerMapping.put(3, "Tie"); //TODO there is no Tie on IMG, just add this value maybe?
+	}
+
+	private void initWinnerStatusMapping()
+	{
+		infronetToIMGWinnerStatusMapping.put(0, "Normally"); //TODO 0 from Infronet means None, but there is no None in IMG, so maybe map 0 to Normally?
+		infronetToIMGWinnerStatusMapping.put(1, "Walkover");
+		infronetToIMGWinnerStatusMapping.put(2, "Retirement");
+		//TODO there is no disqualification on Infronet, but on IMG there is
+	}
+
 	private void initMatchStateMappingMap()
 	{
 		infronetToIMGMatchStateMapping.put("N", "None");
@@ -133,11 +154,14 @@ public class BadmintonSampleFileCreator
 					//if state has changed, we create another matchStateChanged message
 					if (hasMatchStateChanged(msg, previousMessage))
 					{
-						createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
-						//TODO when game finishes, do we want to have MatchStateChanged and MatchFinished, or only MatchFinished? For now generate both
+						//TODO when game finishes, do we want to have MatchStateChanged and MatchFinished, or only MatchFinished? For now generate only MatchFinished
 						if (hasMatchStateChangedToFinish(msg, previousMessage))
 						{
 							createAndHandleMatchFinishedMsg (msg, outputContentByGameId);
+						}
+						else
+						{
+							createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
 						}
 					}
 				}
@@ -176,13 +200,22 @@ public class BadmintonSampleFileCreator
 	{
 		MatchFinished matchFinished = new MatchFinished();
 		matchFinished.setDurationInMinutes(msg.getDurationInMinutes());
-		matchFinished.setReason(reason);
-		matchFinished.setSeqNum(seqNum);
-		matchFinished.setTimestamp(timestamp);
-		matchFinished.setWinner(winner);
+		matchFinished.setReason(getWinnerReason (msg));
+		matchFinished.setSeqNum(msg.getPacketId());
+		matchFinished.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis()));
+		matchFinished.setWinner(getWinner(msg));
 		
-		//TODO ignore delayStatus for now
-		return null;
+		return matchFinished;
+	}
+
+	private String getWinner(Court msg)
+	{
+		return infronetToIMGWinnerMapping.getOrDefault(msg.getWinner(), UNKNOWN); //TODO there is no unknown on IMG, but maybe use it as fallback?
+	}
+
+	private String getWinnerReason(Court msg)
+	{
+		return infronetToIMGWinnerStatusMapping.getOrDefault(msg.getWinnerScoreStatus(), UNKNOWN); //TODO there is no unknown on IMG, but maybe use it as fallback?
 	}
 
 	private boolean hasMatchStateChangedToFinish(Court curMsg, Court previousMessage)

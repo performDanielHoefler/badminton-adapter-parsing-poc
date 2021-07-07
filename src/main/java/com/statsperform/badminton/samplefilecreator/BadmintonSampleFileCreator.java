@@ -33,6 +33,7 @@ import com.statsperform.badminton.legacy.output.CurrentGameScore;
 import com.statsperform.badminton.legacy.output.GameScores;
 import com.statsperform.badminton.legacy.output.Incident;
 import com.statsperform.badminton.legacy.output.IncidentPacket;
+import com.statsperform.badminton.legacy.output.IntervalBreak;
 import com.statsperform.badminton.legacy.output.MatchFinished;
 import com.statsperform.badminton.legacy.output.MatchStateChanged;
 import com.statsperform.badminton.legacy.output.PointScored;
@@ -230,11 +231,9 @@ public class BadmintonSampleFileCreator
 					}
 					else
 					{
-						System.out.println("No message was created for packet with ID [" + msg.getPacketId()
-								+ "], match id [" + msg.getMatchId()
-								+ "]");
+						//TODO for now, we interpret neither state nor incident nor score changes as interval break. According to Thomas there will be a new state introduced, waiting for further samples/details on that
+						createAndHandleIntervalBreakMsg (msg, outputContentByGameId);
 					}
-					//TODO what is IntervalBreak?
 				}
 				previousMessage = msg;
 			}
@@ -260,6 +259,21 @@ public class BadmintonSampleFileCreator
 		}
 	}
 	
+	private void createAndHandleIntervalBreakMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
+	{
+		IntervalBreak intervalBreakMsg = createIntervalBreakMsg (msg);
+		String jsonOutput = convertToJsonString (intervalBreakMsg);
+		addToOutputContentMap (jsonOutput, msg.getMatchId(), outputContentByGameId);
+	}
+
+	private IntervalBreak createIntervalBreakMsg(Court msg)
+	{
+		IntervalBreak ivb = new IntervalBreak();
+		ivb.setSeqNum(msg.getPacketId());
+		ivb.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis()));
+		return ivb;
+	}
+
 	private void createAndHandleIncientMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
 	{
 		IncidentPacket incidentMsg = createIncidentPacketMsg (msg);

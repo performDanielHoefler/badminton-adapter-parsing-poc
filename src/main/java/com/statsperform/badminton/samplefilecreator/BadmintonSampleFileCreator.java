@@ -36,12 +36,16 @@ import com.statsperform.badminton.legacy.output.IncidentPacket;
 import com.statsperform.badminton.legacy.output.IntervalBreak;
 import com.statsperform.badminton.legacy.output.MatchFinished;
 import com.statsperform.badminton.legacy.output.MatchStateChanged;
+import com.statsperform.badminton.legacy.output.Official;
+import com.statsperform.badminton.legacy.output.Player;
 import com.statsperform.badminton.legacy.output.PointScored;
+import com.statsperform.badminton.legacy.output.Pregame;
 import com.statsperform.badminton.legacy.output.PreviousGameScore;
+import com.statsperform.badminton.legacy.output.Team;
 
 public class BadmintonSampleFileCreator
 {
-	private String inputFileLocation = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\BWF\\Denmarkopen\\fullmatchfile_per_game\\fullmatch ID 190.txt";
+	private String inputFileLocation = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\BWF\\Denmarkopen\\fullmatchfile_per_game\\fullmatch ID 255.txt";
 	private String outputFileRootPathString = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\IMG\\fullmatchfile";
 	
 	private XmlMapper xmlMapper;
@@ -205,10 +209,10 @@ public class BadmintonSampleFileCreator
 				try
 				{
 					//first message of the game -> MatchStateChange
-					//TODO or should this rather be a pregame message?
+					//TODO or should this rather be a pregame message? Let's go with Pregame message for now
 					if (previousMessage == null)
 					{
-						createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
+						createAndHandlePregameMsg (msg, outputContentByGameId);
 					}
 					else
 					{
@@ -278,6 +282,75 @@ public class BadmintonSampleFileCreator
 				IOUtils.writeLines(outputForGame, null, fos, "UTF-8");
 			}
 		}
+	}
+
+	private void createAndHandlePregameMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
+	{
+		System.out.println("For Match ID " + msg.getMatchId() + ", packet id " + msg.getPacketId()
+			+ ", create Pregame message");
+		
+		Pregame pregameMsg = createPregameMsg (msg);
+		String jsonOutput = convertToJsonString (pregameMsg);
+		addToOutputContentMap (jsonOutput, msg.getMatchId(), outputContentByGameId);
+	}
+
+	private Pregame createPregameMsg(Court msg)
+	{
+		Pregame pregame = new Pregame();
+		
+		pregame.setCourtId(String.valueOf(msg.getCourtId()));
+		pregame.setCourtName(msg.getName());
+		pregame.setEvent(msg.getEvent());
+		pregame.setMatchState(getMatchStateFromMsg(msg));
+		pregame.setOfficial1(convertToLegacyOfficial (msg.getOfficial1()));
+		pregame.setOfficial2(convertToLegacyOfficial (msg.getOfficial2()));
+		pregame.setReceiver(getReceiver(msg));
+		pregame.setRound(msg.getRound());
+		pregame.setSeqNum(getSequenceNrForGame(msg));
+		pregame.setServer(getServer(msg));
+		pregame.setTeamA(convertToLegacyTeamDetails (msg.getTeam1()));
+		pregame.setTeamB(convertToLegacyTeamDetails (msg.getTeam2()));
+		pregame.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis()));
+		pregame.setTournamentId(msg.getTournamentCode().getTournamentCode()); //TODO use this as id for now, not sure if that's ok though
+		pregame.setTournamentName(msg.getTournament().getTournament());
+		
+		//TODO omit delayStatus for now
+		
+		return pregame;
+	}
+
+	private Official convertToLegacyOfficial(com.statsperform.badminton.infronet.input.Official officialInfronet)
+	{
+		Official legacyOfficial = new Official();
+		legacyOfficial.setFirstName(officialInfronet.getFirstName());
+		legacyOfficial.setName(officialInfronet.getName());
+		legacyOfficial.setCountry(officialInfronet.getCountry()); //TODO leaving ISO code is probably fine here?
+		return legacyOfficial;
+	}
+
+	private Team convertToLegacyTeamDetails(com.statsperform.badminton.infronet.input.Team teamInfronet)
+	{
+		Team legacyTeam = new Team();
+		
+		legacyTeam.setPlayer1(convertToLegacyPlayer (teamInfronet.getPlayer1()));
+		legacyTeam.setPlayer2(convertToLegacyPlayer (teamInfronet.getPlayer2()));
+		
+		return legacyTeam;
+	}
+
+	private Player convertToLegacyPlayer(com.statsperform.badminton.infronet.input.Player playerInfronet)
+	{
+		Player legacyPlayer = null;
+		
+		if (playerInfronet!=null)
+		{
+			legacyPlayer = new Player();
+			legacyPlayer.setId(playerInfronet.getMemberId()); //TODO exchange with UUID probably?
+			legacyPlayer.setName(playerInfronet.getName());
+			legacyPlayer.setCountry(playerInfronet.getCountry()); //TODO leave ISO code as is I guess?
+		}
+		
+		return legacyPlayer;
 	}
 
 	private void createAndHandleIntervalBreakMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
@@ -687,18 +760,24 @@ public class BadmintonSampleFileCreator
 	{
 		MatchStateChanged matchStateChangedMsg = new MatchStateChanged();
 		
+		matchStateChangedMsg.setMatchState(getMatchStateFromMsg (msg));
+		matchStateChangedMsg.setSeqNum(getSequenceNrForGame(msg));
+		matchStateChangedMsg.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis())); //TODO infronet doesn't provide a timestamp, so we will always have to use current timestamp?
+		//TODO ignore delayStatus for now
+		
+		return matchStateChangedMsg;
+	}
+
+	private String getMatchStateFromMsg(Court msg)
+	{
 		MatchState ms = msg.getMatchState();
 		String matchStateString = "None";
 		if (ms!=null)
 		{
 			matchStateString = ms.getMatchState();
 		}
-		matchStateChangedMsg.setMatchState(infronetToIMGMatchStateMapping.getOrDefault(matchStateString, matchStateString));
-		matchStateChangedMsg.setSeqNum(getSequenceNrForGame(msg));
-		matchStateChangedMsg.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis())); //TODO infronet doesn't provide a timestamp, so we will always have to use current timestamp?
-		//TODO ignore delayStatus for now
 		
-		return matchStateChangedMsg;
+		return infronetToIMGMatchStateMapping.getOrDefault(matchStateString, matchStateString);
 	}
 
 	private String convertToFormattedTimestamp(long timestamp)

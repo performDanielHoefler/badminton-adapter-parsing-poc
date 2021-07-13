@@ -199,43 +199,61 @@ public class BadmintonSampleFileCreator
 			//for now we'll just focus on court messages, ping (basically the heartbeats) are irrelevant at this stage)
 			for (Court msg : messagesForGame)
 			{
-				//first message of the game -> MatchStateChange
-				//TODO or should this rather be a pregame message?
-				if (previousMessage == null)
+				try
 				{
-					createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
-				}
-				else
-				{
-					//if state has changed, we create another matchStateChanged message
-					if (hasMatchStateChanged(msg, previousMessage))
+					//first message of the game -> MatchStateChange
+					//TODO or should this rather be a pregame message?
+					if (previousMessage == null)
 					{
-						//TODO when game finishes, do we want to have MatchStateChanged and MatchFinished, or only MatchFinished? For now generate only MatchFinished
-						if (hasMatchStateChangedToFinish(msg, previousMessage))
-						{
-							createAndHandleMatchFinishedMsg (msg, outputContentByGameId);
-						}
-						else
-						{
-							createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
-						}
-					}
-					//TODO is it possible that the score changes in the same message as when an incident occurs? For now let's assume not
-					else if (hasScoreChanged (msg, previousMessage))
-					{
-						createAndHandlePointScoredMsg (msg, outputContentByGameId);
-					}
-					else if (isIncident (msg))
-					{
-						createAndHandleIncientMsg (msg, outputContentByGameId);
+						createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
 					}
 					else
 					{
-						//TODO for now, we interpret neither state nor incident nor score changes as interval break. According to Thomas there will be a new state introduced, waiting for further samples/details on that
-						createAndHandleIntervalBreakMsg (msg, outputContentByGameId);
+						//if state has changed, we create another matchStateChanged message
+						boolean matchStateChanged = hasMatchStateChanged(msg, previousMessage);
+						boolean scoreChanged = hasScoreChanged (msg, previousMessage);
+						boolean isIncident = isIncident (msg);
+						//seems that several changes in one bundle are possible, so chain them (for now with the limitation that they will have the same sequence number)
+						if (matchStateChanged || scoreChanged || isIncident)
+						{
+							if (matchStateChanged)
+							{
+								//TODO when game finishes, do we want to have MatchStateChanged and MatchFinished, or only MatchFinished? For now generate only MatchFinished
+								if (hasMatchStateChangedToFinish(msg, previousMessage))
+								{
+									createAndHandleMatchFinishedMsg (msg, outputContentByGameId);
+								}
+								else
+								{
+									createAndHandleMatchStateChangedMsg (msg, outputContentByGameId);
+								}
+							}
+							//is it possible that the score changes in the same message as when an incident occurs? For now let's assume not
+							//after analyzing match ID 190 it seems this is possible
+							//no score changes after match state changed, else we'd have them e.g. when new set is started (which makes no sense)
+							if (scoreChanged && !matchStateChanged)
+							{
+								createAndHandlePointScoredMsg (msg, outputContentByGameId);
+							}
+							if (isIncident (msg))
+							{
+								createAndHandleIncientMsg (msg, outputContentByGameId);
+							}
+						}
+						else
+						{
+							//TODO for now, we interpret neither state nor incident nor score changes as interval break. According to Thomas there will be a new state introduced, waiting for further samples/details on that
+							createAndHandleIntervalBreakMsg (msg, outputContentByGameId);
+						}
 					}
+					previousMessage = msg;
 				}
-				previousMessage = msg;
+				catch (Exception e)
+				{
+					System.out.println("Error with game id " + msg.getMatchId()
+							+ ", packet id " + msg.getPacketId());
+					e.printStackTrace();
+				}
 			}
 		}
 		
@@ -258,7 +276,7 @@ public class BadmintonSampleFileCreator
 			}
 		}
 	}
-	
+
 	private void createAndHandleIntervalBreakMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
 	{
 		IntervalBreak intervalBreakMsg = createIntervalBreakMsg (msg);
@@ -449,7 +467,7 @@ public class BadmintonSampleFileCreator
 	{
 		Score result = null;
 		List<Score> scoreList = getScoreList (set);
-		if (scoreList!=null)
+		if (scoreList!=null && scoreList.size()>=2)
 		{
 			result = scoreList.get(scoreList.size()-2);
 		}
@@ -460,7 +478,7 @@ public class BadmintonSampleFileCreator
 	{
 		Score lastScore = null;
 		List<Score> scoreList = getScoreList (set);
-		if (scoreList!=null)
+		if (CollectionUtils.isNotEmpty(scoreList))
 		{
 			lastScore = scoreList.get(scoreList.size()-1);
 		}
@@ -511,7 +529,8 @@ public class BadmintonSampleFileCreator
 				
 				Score lastScore = getLastScore(curMsgLastSet);
 				Score secondLastScore = getSecondLastScore(curMsgLastSet);
-				if (getScoreList(curMsgLastSet).size()!=getScoreList(prevMsgLastSet).size()
+				if (lastScore!=null && secondLastScore!=null
+						&& getScoreList(curMsgLastSet).size()!=getScoreList(prevMsgLastSet).size()
 						&& (lastScore.getPoints1()!=secondLastScore.getPoints1() || lastScore.getPoints2()!=secondLastScore.getPoints2()))
 				{
 					hasChanged = true;

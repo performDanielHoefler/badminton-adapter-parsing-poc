@@ -41,7 +41,7 @@ import com.statsperform.badminton.legacy.output.PreviousGameScore;
 
 public class BadmintonSampleFileCreator
 {
-	private String inputFileLocation = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\BWF\\Denmarkopen\\fullmatchfile_per_game\\fullmatch ID 127.txt";
+	private String inputFileLocation = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\BWF\\Denmarkopen\\fullmatchfile_per_game\\fullmatch ID 190.txt";
 	private String outputFileRootPathString = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\IMG\\fullmatchfile";
 	
 	private XmlMapper xmlMapper;
@@ -64,6 +64,9 @@ public class BadmintonSampleFileCreator
 	private final String TEAM_A_PLAYER_2 = "TeamAPlayer2";
 	private final String TEAM_B_PLAYER_1 = "TeamBPlayer1";
 	private final String TEAM_B_PLAYER_2 = "TeamBPlayer2";
+	
+	private Map<Integer, Integer> seqNumByMatchId = new HashMap<>();
+	private Integer startValue = 1;
 	
 	public BadmintonSampleFileCreator ()
 	{
@@ -212,7 +215,7 @@ public class BadmintonSampleFileCreator
 						//if state has changed, we create another matchStateChanged message
 						boolean matchStateChanged = hasMatchStateChanged(msg, previousMessage);
 						boolean scoreChanged = hasScoreChanged (msg, previousMessage);
-						boolean isIncident = isIncident (msg);
+						boolean isIncident = isIncident (msg, previousMessage);
 						//seems that several changes in one bundle are possible, so chain them (for now with the limitation that they will have the same sequence number)
 						if (matchStateChanged || scoreChanged || isIncident)
 						{
@@ -235,7 +238,7 @@ public class BadmintonSampleFileCreator
 							{
 								createAndHandlePointScoredMsg (msg, outputContentByGameId);
 							}
-							if (isIncident (msg))
+							if (isIncident (msg, previousMessage))
 							{
 								createAndHandleIncientMsg (msg, outputContentByGameId);
 							}
@@ -279,6 +282,9 @@ public class BadmintonSampleFileCreator
 
 	private void createAndHandleIntervalBreakMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
 	{
+		System.out.println("For Match ID " + msg.getMatchId() + ", packet id " + msg.getPacketId()
+			+ ", create IntervalBreak message");
+		
 		IntervalBreak intervalBreakMsg = createIntervalBreakMsg (msg);
 		String jsonOutput = convertToJsonString (intervalBreakMsg);
 		addToOutputContentMap (jsonOutput, msg.getMatchId(), outputContentByGameId);
@@ -287,13 +293,16 @@ public class BadmintonSampleFileCreator
 	private IntervalBreak createIntervalBreakMsg(Court msg)
 	{
 		IntervalBreak ivb = new IntervalBreak();
-		ivb.setSeqNum(msg.getPacketId());
+		ivb.setSeqNum(getSequenceNrForGame(msg));
 		ivb.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis()));
 		return ivb;
 	}
 
 	private void createAndHandleIncientMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
 	{
+		System.out.println("For Match ID " + msg.getMatchId() + ", packet id " + msg.getPacketId()
+			+ ", create IncidentPacket message");
+		
 		IncidentPacket incidentMsg = createIncidentPacketMsg (msg);
 		String jsonOutput = convertToJsonString (incidentMsg);
 		addToOutputContentMap (jsonOutput, msg.getMatchId(), outputContentByGameId);
@@ -304,7 +313,7 @@ public class BadmintonSampleFileCreator
 		IncidentPacket icp = new IncidentPacket();
 		icp.setIncident(getIncidentData (msg));
 		icp.setScores(getGameScores(msg));
-		icp.setSeqNum(msg.getPacketId());
+		icp.setSeqNum(getSequenceNrForGame(msg));
 		icp.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis()));
 		
 		//TODO for now omit delayStatus attribute
@@ -349,23 +358,26 @@ public class BadmintonSampleFileCreator
 		return incident;
 	}
 
-	private boolean isIncident(Court msg)
+	private boolean isIncident(Court msg,
+			Court previousMessage)
 	{
 		boolean isIncident = false;
 		
 		List<Set> setList = getSetList(msg.getSets());
-		if (CollectionUtils.isNotEmpty(setList))
+		List<Set> setListPrevMsg = getSetList(previousMessage.getSets());
+		if (CollectionUtils.isNotEmpty(setList) && CollectionUtils.isNotEmpty(setListPrevMsg))
 		{
 			Set lastSet = getLastSet(setList);
-			if (lastSet!=null)
+			Set lastSetPrevMsg = getLastSet(setListPrevMsg);
+			if (lastSet!=null && lastSetPrevMsg!=null)
 			{
 				Score lastScore = getLastScore(lastSet);
-				if (lastScore!=null)
+				Score lastScorePrevMsg = getLastScore(lastSetPrevMsg);
+				if (lastScore!=null && lastScorePrevMsg!=null)
 				{
-					isIncident = StringUtils.isNotEmpty(lastScore.getSt1p1())
-							|| StringUtils.isNotEmpty(lastScore.getSt1p2())
-							|| StringUtils.isNotEmpty(lastScore.getSt2p1())
-							|| StringUtils.isNotEmpty(lastScore.getSt2p2());
+					boolean isIncidentCurMsg = isIncidentInMsg (lastScore);
+					boolean isIncidentPrevMsg = isIncidentInMsg (lastScorePrevMsg);
+					isIncident = isIncidentCurMsg && !isIncidentPrevMsg;
 				}
 			}
 		}
@@ -373,8 +385,19 @@ public class BadmintonSampleFileCreator
 		return isIncident;
 	}
 
+	private boolean isIncidentInMsg(Score score)
+	{
+		return StringUtils.isNotEmpty(score.getSt1p1())
+				|| StringUtils.isNotEmpty(score.getSt1p2())
+				|| StringUtils.isNotEmpty(score.getSt2p1())
+				|| StringUtils.isNotEmpty(score.getSt2p2());
+	}
+
 	private void createAndHandlePointScoredMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
 	{
+		System.out.println("For Match ID " + msg.getMatchId() + ", packet id " + msg.getPacketId()
+			+ ", create PointScored message");
+		
 		PointScored pointScoredMsg = createPointScoredMsg (msg);
 		String jsonOutput = convertToJsonString (pointScoredMsg);
 		addToOutputContentMap (jsonOutput, msg.getMatchId(), outputContentByGameId);
@@ -386,7 +409,7 @@ public class BadmintonSampleFileCreator
 		psMsg.setGameScores(getGameScores (msg));
 		psMsg.setReceiver(getReceiver (msg));
 		psMsg.setScoringTeam(getScoringTeam (msg));
-		psMsg.setSeqNum(msg.getPacketId());
+		psMsg.setSeqNum(getSequenceNrForGame(msg));
 		psMsg.setServer(getServer (msg));
 		psMsg.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis()));
 		psMsg.setUndo(false); //TODO for now always assume it's not a score correction, not entirely sure on how to detect that
@@ -562,6 +585,9 @@ public class BadmintonSampleFileCreator
 
 	private void createAndHandleMatchFinishedMsg(Court msg, Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
 	{
+		System.out.println("For Match ID " + msg.getMatchId() + ", packet id " + msg.getPacketId()
+			+ ", create MatchFinished message");
+		
 		MatchFinished matchFinishedMsg = createMatchFinishedMsg (msg);
 		String jsonOutput = convertToJsonString (matchFinishedMsg);
 		addToOutputContentMap (jsonOutput, msg.getMatchId(), outputContentByGameId);
@@ -572,11 +598,18 @@ public class BadmintonSampleFileCreator
 		MatchFinished matchFinished = new MatchFinished();
 		matchFinished.setDurationInMinutes(msg.getDurationInMinutes());
 		matchFinished.setReason(getWinnerReason (msg));
-		matchFinished.setSeqNum(msg.getPacketId());
+		matchFinished.setSeqNum(getSequenceNrForGame (msg));
 		matchFinished.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis()));
 		matchFinished.setWinner(getWinner(msg));
 		
 		return matchFinished;
+	}
+
+	private int getSequenceNrForGame(Court msg)
+	{
+		Integer sequenceNr = seqNumByMatchId.getOrDefault(msg.getMatchId(), startValue);
+		seqNumByMatchId.put(msg.getMatchId(), sequenceNr+1);
+		return sequenceNr;
 	}
 
 	private String getWinner(Court msg)
@@ -612,6 +645,9 @@ public class BadmintonSampleFileCreator
 	private void createAndHandleMatchStateChangedMsg(Court msg,
 			Map<Integer, List<String>> outputContentByGameId) throws JsonProcessingException
 	{
+		System.out.println("For Match ID " + msg.getMatchId() + ", packet id " + msg.getPacketId()
+				+ ", create MatchStateChanged message");
+		
 		MatchStateChanged matchStateChangedMsg = createMatchStateChangedMsg (msg);
 		String jsonOutput = convertToJsonString (matchStateChangedMsg);
 		addToOutputContentMap (jsonOutput, msg.getMatchId(), outputContentByGameId);
@@ -658,7 +694,7 @@ public class BadmintonSampleFileCreator
 			matchStateString = ms.getMatchState();
 		}
 		matchStateChangedMsg.setMatchState(infronetToIMGMatchStateMapping.getOrDefault(matchStateString, matchStateString));
-		matchStateChangedMsg.setSeqNum(msg.getPacketId()); //TODO maybe custom sequencing will have to be introduced here?
+		matchStateChangedMsg.setSeqNum(getSequenceNrForGame(msg));
 		matchStateChangedMsg.setTimestamp(convertToFormattedTimestamp(System.currentTimeMillis())); //TODO infronet doesn't provide a timestamp, so we will always have to use current timestamp?
 		//TODO ignore delayStatus for now
 		

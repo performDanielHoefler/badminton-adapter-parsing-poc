@@ -6,6 +6,9 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,8 +23,13 @@ import com.statsperform.badminton.infronet.input.Ping;
 
 public class SamplesByGameCreatorFileList
 {
+	/*
 	private final String rootPathStringInputFiles = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\BWF\\Sample data 2021-08-17\\HSBC World Tour Finals 2020\\test";
 	private final String rootPathStringOutputFiles = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\BWF\\Sample data 2021-08-17\\HSBC World Tour Finals 2020\\test\\fullmatchfiles";
+	*/
+	
+	private final String rootPathStringInputFiles = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\testU_Undo Individual\\test";
+	private final String rootPathStringOutputFiles = "C:\\Users\\daniel.hoefler\\Desktop\\Badminton\\base investigation\\samples\\testU_Undo Individual\\test\\fullmatchfiles";
 	
 	private XmlMapper xmlMapper;
 	
@@ -43,9 +51,30 @@ public class SamplesByGameCreatorFileList
 			}
 		});
 		
+		List<File> inputFilesList = Arrays.asList(inputFiles);
+		
 		Map<Integer, List<String>> messagesByGame = new HashMap<>();
 		
-		for (File inputFile : inputFiles)
+		//sort files by the identifier in the file name
+		Collections.sort(inputFilesList, new Comparator<File>() {
+
+			@Override
+			public int compare(File o1, File o2)
+			{
+				int id1 = getNumberFromFileName (o1);
+				int id2 = getNumberFromFileName (o2);
+				return Integer.valueOf(id1).compareTo(id2);
+			}
+
+			private int getNumberFromFileName(File o)
+			{
+				String fileName = o.getName();
+				int number = Integer.valueOf(fileName.substring(5, fileName.indexOf(".xml")));
+				return number;
+			}
+		});
+		
+		for (File inputFile : inputFilesList)
 		{
 			try (FileInputStream fis = new FileInputStream(inputFile))
 			{
